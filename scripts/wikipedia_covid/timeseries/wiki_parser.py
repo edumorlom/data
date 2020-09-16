@@ -4,6 +4,7 @@ from urllib.request import urlopen
 from bs4 import BeautifulSoup
 import pandas as pd
 import Config
+import json
 
 
 def _get_css_value(css: str, key: str) -> str:
@@ -54,17 +55,31 @@ def _is_valid_date(date_text: str) -> bool:
     except ValueError:
         return False
 
-
-def get_place_name_from_url(url: str) -> str:
+def _get_place_name_from_url(url: str) -> str:
     """
-    Given a Wikipedia Template Time Series Chart URL,
-    return the name of the place being observed.
-    @param url: Wikipedia Template Time Series Chart URL
+    Given a Wikipedia TimeSer
     """
-    place_name = url.split('_medical_cases_chart')[-2]
-    place_name = place_name.split('pandemic_data/')[-1]
-    place_name = place_name.split('/')[-1]
+    subregion_region = url.split('_medical_cases_chart')[-2] \
+        .split('pandemic_data/')[-1].split("/")[-2:]
+    subregion_region.reverse()
+    place_name = ",".join(subregion_region)
     return place_name
+
+
+# Test to make it work, otherwise revert git.
+def _query_wikipedia(query: str) -> str:
+    """
+    Given a query return the url of first Wikipedia result.
+    @param query: the name of wikipedia page to query.
+    Example: 
+    query: "Spain"
+    returns: https://wikipedia.org/wiki/Spain/
+    """
+    query_url = f"""https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=1&namespace=0&format=json"""
+    json_str = urlopen(query_url).read()
+    wiki_place_url = json.loads(json_str)[3][0]
+    return wiki_place_url
+
 
 
 def get_wiki_id(wiki_url: str) -> str:
@@ -104,8 +119,8 @@ def parse_time_series_chart(wiki_url: str) -> Dict[str, Dict[str, int]]:
 
     for span_label in span_labels:
         # There must be two contents inside the span.
-        # conten1: color
-        # contenn2: label
+        # content1: color
+        # content2: label
         if len(span_label.contents) != 2:
             continue
 
@@ -190,15 +205,18 @@ if __name__ == "__main__":
             continue
 
         # Get the place name from the Wikipedia URL.
-        place_name = get_place_name_from_url(url)
+        place_name = _get_place_name_from_url(url)
+        print(place_name)
+
+        wiki_url = _query_wikipedia(place_name)
+        print(wiki_url)
 
         # Store the current table to the all_tables.
         # Traspose the table, each column corresponds to a label.
         table = pd.DataFrame(data).T
 
         # Get the Wiki Data Id of the place.
-        table['wikiId'] = get_wiki_id('https://en.wikipedia.org/wiki/' +
-                                      place_name)
+        table['wikiId'] = get_wiki_id(wiki_url)
         
         all_tables.append(table)
 
