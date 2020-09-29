@@ -1,0 +1,1 @@
+https://api.covid19india.org/v4/min/timeseries-WH-min.json
